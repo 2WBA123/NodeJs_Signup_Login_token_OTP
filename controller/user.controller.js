@@ -17,10 +17,10 @@ exports.signUp = async (req, res) => {
 	const transport = nodemailer.createTransport({
 		service: "Gmail",
 		auth: {
-		  user: "emsproject44@gmail.com",
-		  pass: "Awahab123@",
+			user: "emsproject44@gmail.com",
+			pass: "Awahab123@",
 		},
-	  });
+	});
 
 	User.find({ email: req.body.email })
 		.exec()
@@ -47,16 +47,16 @@ exports.signUp = async (req, res) => {
 							_id: mongoose.Types.ObjectId(),
 							name: req.body.name,
 							email: req.body.email,
-							password:hash
+							password: hash
 						});
 						user.save()
 							// .select(' email password')
 							.then((result) => {
 								res.status(201).json(result);
-								const token = jwt.sign(
+								const emailtoken = jwt.sign(
 									{
 										email: req.body.email,
-										user_name:req.body.name,
+										user_name: req.body.name,
 									},
 									"secret",
 									{
@@ -71,9 +71,9 @@ exports.signUp = async (req, res) => {
 									    <h1>Email Confirmation</h1>
 										<h2>Hello ${req.body.name}</h2>
 										<p>Thank you for Registration. Please confirm your email copy this token and send it back to confirm verification</p>
-										<p> Click here</p>
+										<p> ${emailtoken}</p>
 										</div>`,
-								  }).catch(err => console.log(err));
+								}).catch(err => console.log(err));
 							})
 							.catch((err) => {
 								console.log(err);
@@ -112,27 +112,27 @@ exports.logIn = async (req, res) => {
 						message: 'Login Failed',
 					});
 				}
-						if (result) {
-							const token = jwt.sign(
-								{
-									email: user[0].email,
-									user_id: user[0].id,
-								},
-								"secret",
-								{
-									expiresIn: '5h',
-								}
-							);
-							return res.status(200).json({
-								message: 'Login Sucessfull !',
-								token: token,
-							});
+				if (result) {
+					const token = jwt.sign(
+						{
+							email: user[0].email,
+							user_id: user[0].id,
+						},
+						"secret",
+						{
+							expiresIn: '5h',
 						}
-						return res.status(401).json({
-							message: 'Auth Failed',
-						});
-						//	
+					);
+					return res.status(200).json({
+						message: 'Login Sucessfull !',
+						token: token,
+					});
+				}
+				return res.status(401).json({
+					message: 'Auth Failed',
 				});
+				//	
+			});
 		})
 		.catch((err) => {
 			console.log(err);
@@ -144,27 +144,52 @@ exports.logIn = async (req, res) => {
 
 exports.verifyToken = async (req, res, next) => {
 	try {
-	  const { token } = req.body;
-	  console.log(token);
-	  const { user_id } =  jwt.verify(
-		token,
-		"secret",
-	  );
-     console.log(user_id)
-	  const user = await User.findById(user_id);
-	  if (user) {
-		const { name, email} = user;
-		return res.status(200).json({
-		  user_id,
-		  name,
-		  email,
-		  token,
-		});
-	  }
-	  throw new Error('Something went wrong');
+		const { token } = req.body;
+		console.log(token);
+		const { user_id } = jwt.verify(
+			token,
+			"secret",
+		);
+		console.log(user_id)
+		const user = await User.findById(user_id);
+		if (user) {
+			const { name, email } = user;
+			return res.status(200).json({
+				user_id,
+				name,
+				email,
+				token,
+			});
+		}
+		throw new Error('Something went wrong');
 	} catch (error) {
-	  res.status(500).json({
-		message: 'Something went wrong,please try again later',
-	  });
+		res.status(500).json({
+			message: 'Something went wrong,please try again later',
+		});
 	}
-  };
+};
+
+exports.emailVerified = async (req, res, next) => {
+	try {
+		const { token } = req.body;
+		console.log(token);
+		const { email, user_name } = jwt.verify(
+			token,
+			"secret",
+		);
+		console.log(user_name)
+		const user = await User.findById(email);
+		if (user) {
+			user.email_verified=true;
+			return res.status(200).json({
+				email,
+				user_name
+			});
+		}
+		throw new Error('Something went wrong');
+	} catch (error) {
+		res.status(500).json({
+			message: 'Something went wrong,please try again later',
+		});
+	}
+};

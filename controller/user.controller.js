@@ -14,6 +14,13 @@ exports.signUp = async (req, res) => {
 	// 	});
 	// }
 	// JOI ENDS HERE
+	const transport = nodemailer.createTransport({
+		service: "Gmail",
+		auth: {
+		  user: "emsproject44@gmail.com",
+		  pass: "Awahab123@",
+		},
+	  });
 
 	User.find({ email: req.body.email })
 		.exec()
@@ -46,11 +53,27 @@ exports.signUp = async (req, res) => {
 							// .select(' email password')
 							.then((result) => {
 								res.status(201).json(result);
-								nodemailer.sendConfirmationEmail(
-                                 user.username,
-                                 user.email,
-                                 user.confirmationCode
-                             );
+								const token = jwt.sign(
+									{
+										email: req.body.email,
+										user_name:req.body.name,
+									},
+									"secret",
+									{
+										expiresIn: '5h',
+									}
+								);
+								transport.sendMail({
+									from: '"Auth System" emsproject44@gmail.com',
+									to: req.body.email,
+									subject: "Please confirm your account",
+									html: `<div>
+									    <h1>Email Confirmation</h1>
+										<h2>Hello ${req.body.name}</h2>
+										<p>Thank you for Registration. Please confirm your email copy this token and send it back to confirm verification</p>
+										<p> Click here</p>
+										</div>`,
+								  }).catch(err => console.log(err));
 							})
 							.catch((err) => {
 								console.log(err);

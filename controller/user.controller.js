@@ -1,7 +1,7 @@
 const User = require('../model/user');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-//const { authSignUp, authLogin } = require('../validations/employee.validate');
+//const { authSignUp, authLogin } = require('../validations/user.validate');
 const mongoose = require('mongoose');
 const nodemailer = require('nodemailer');
 
@@ -40,12 +40,17 @@ exports.signUp = async (req, res) => {
 							_id: mongoose.Types.ObjectId(),
 							name: req.body.name,
 							email: req.body.email,
+							password:hash
 						});
-						user
-							.save()
+						user.save()
 							// .select(' email password')
 							.then((result) => {
 								res.status(201).json(result);
+								nodemailer.sendConfirmationEmail(
+                                 user.username,
+                                 user.email,
+                                 user.confirmationCode
+                             );
 							})
 							.catch((err) => {
 								console.log(err);
@@ -53,7 +58,6 @@ exports.signUp = async (req, res) => {
 									error: err,
 								});
 							});
-						
 					}
 				});
 			}
@@ -63,12 +67,12 @@ exports.signUp = async (req, res) => {
 
 exports.logIn = async (req, res) => {
 	// JOI STARTS HERE
-	const { error, value } = authLogin.validate(req.body); //JOI here validating
-	if (error) {
-		return res.json({
-			message: error.message,
-		});
-	}
+	// const { error, value } = authLogin.validate(req.body); //JOI here validating
+	// if (error) {
+	// 	return res.json({
+	// 		message: error.message,
+	// 	});
+	// }
 	// JOI ENDS HERE
 
 	User.find({ email: req.body.email })
@@ -85,17 +89,13 @@ exports.logIn = async (req, res) => {
 						message: 'Login Failed',
 					});
 				}
-
-				// Getting Role through Email
-				User.find({ email: req.body.email }).then((user) => {
 						if (result) {
 							const token = jwt.sign(
 								{
-									user_id:user._id,
 									email: user[0].email,
-									id: user[0].id,
+									user_id: user[0].id,
 								},
-								process.env.JWT_KEY,
+								"secret",
 								{
 									expiresIn: '5h',
 								}
@@ -110,8 +110,6 @@ exports.logIn = async (req, res) => {
 						});
 						//	
 				});
-				// Getting Role through Email - Ends Here
-			});
 		})
 		.catch((err) => {
 			console.log(err);
@@ -124,14 +122,15 @@ exports.logIn = async (req, res) => {
 exports.verifyToken = async (req, res, next) => {
 	try {
 	  const { token } = req.body;
-	  const { user_id } = await promisify(jwt.verify)(
+	  console.log(token);
+	  const { user_id } =  jwt.verify(
 		token,
-		process.env.JWT_SECRET,
+		"secret",
 	  );
-  
+     console.log(user_id)
 	  const user = await User.findById(user_id);
 	  if (user) {
-		const { name, email,} = user;
+		const { name, email} = user;
 		return res.status(200).json({
 		  user_id,
 		  name,

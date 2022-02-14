@@ -15,7 +15,7 @@ exports.signUp = async (req, res) => {
 	// }
 	// JOI ENDS HERE
 
-	Employee.find({ email: req.body.email })
+	User.find({ email: req.body.email })
 		.exec()
 		.then((user) => {
 			if (user.length >= 1) {
@@ -38,15 +38,8 @@ exports.signUp = async (req, res) => {
 						// Added Block -- Replaced
 						const user = new User({
 							_id: mongoose.Types.ObjectId(),
-							fname: req.body.fname,
-							lname: req.body.lname,
-							gender: req.body.gender,
-							age: req.body.age,
-							phone: req.body.phone,
+							name: req.body.name,
 							email: req.body.email,
-							password: hash,
-							department: req.body.department,
-							role: req.body.role,
 						});
 						user
 							.save()
@@ -78,15 +71,15 @@ exports.logIn = async (req, res) => {
 	}
 	// JOI ENDS HERE
 
-	Employee.find({ email: req.body.email })
+	User.find({ email: req.body.email })
 		.exec()
-		.then((employee) => {
-			if (employee.length < 1) {
+		.then((user) => {
+			if (user.length < 1) {
 				return res.status(404).json({
 					message: 'No Email Found !',
 				});
 			}
-			bcrypt.compare(req.body.password, employee[0].password, (err, result) => {
+			bcrypt.compare(req.body.password, user[0].password, (err, result) => {
 				if (err) {
 					return res.status(401).json({
 						message: 'Login Failed',
@@ -94,16 +87,12 @@ exports.logIn = async (req, res) => {
 				}
 
 				// Getting Role through Email
-				Employee.find({ email: req.body.email }).then((employee) => {
-					Role.findById({ _id: employee[0].role }).then((val) => {
-						console.log(val.name);
-						//
+				User.find({ email: req.body.email }).then((user) => {
 						if (result) {
 							const token = jwt.sign(
 								{
-									email: employee[0].email,
-									role: val.name,
-									id: employee[0].id,
+									email: user[0].email,
+									id: user[0].id,
 								},
 								process.env.JWT_KEY,
 								{
@@ -111,7 +100,7 @@ exports.logIn = async (req, res) => {
 								}
 							);
 							return res.status(200).json({
-								message: 'Login Sucessful !',
+								message: 'Login Sucessfull !',
 								token: token,
 							});
 						}
@@ -119,7 +108,7 @@ exports.logIn = async (req, res) => {
 							message: 'Auth Failed',
 						});
 						//
-					});
+					
 				});
 				// Getting Role through Email - Ends Here
 			});

@@ -23,7 +23,7 @@ exports.signUp = async (req, res) => {
 					message: 'Email Already Exist !',
 				});
 			}
-			// Validating Employee
+			// Validating User
 			if (!req.body) {
 				return res.status(400).send({
 					message: 'Please Enter Some Data',
@@ -91,6 +91,7 @@ exports.logIn = async (req, res) => {
 						if (result) {
 							const token = jwt.sign(
 								{
+									user_id:user._id,
 									email: user[0].email,
 									id: user[0].id,
 								},
@@ -107,8 +108,7 @@ exports.logIn = async (req, res) => {
 						return res.status(401).json({
 							message: 'Auth Failed',
 						});
-						//
-					
+						//	
 				});
 				// Getting Role through Email - Ends Here
 			});
@@ -120,3 +120,29 @@ exports.logIn = async (req, res) => {
 			});
 		});
 };
+
+exports.verifyToken = async (req, res, next) => {
+	try {
+	  const { token } = req.body;
+	  const { user_id } = await promisify(jwt.verify)(
+		token,
+		process.env.JWT_SECRET,
+	  );
+  
+	  const user = await User.findById(user_id);
+	  if (user) {
+		const { name, email,} = user;
+		return res.status(200).json({
+		  user_id,
+		  name,
+		  email,
+		  token,
+		});
+	  }
+	  throw new Error('Something went wrong');
+	} catch (error) {
+	  res.status(500).json({
+		message: 'Something went wrong,please try again later',
+	  });
+	}
+  };

@@ -5,12 +5,13 @@ const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const nodemailer = require('nodemailer');
 
-var OTP;
+
 exports.GenerateOtp = () => {
 	var otp = Math.random();
 	otp = otp * 1000000;
-	OTP = parseInt(otp);
-	console.log(OTP);
+	otp = parseInt(otp);
+	console.log(otp);
+	return otp;
 }
 
 var transport = nodemailer.createTransport({
@@ -115,8 +116,17 @@ exports.logIn = async (req, res) => {
 				}
 				if (result) {
 					if (user[0].email_Verified) {
-						this.GenerateOtp();
-						console.log("otp = ", OTP)
+						//console.log("otp = ", OTP)
+						if(user[0].otp.length<3){
+							const otp = this.GenerateOtp()
+							user[0].otp.push(otp);
+							user[0].save();
+						}else{
+							return res.status(401).json({
+								message: 'OTP Limmit reached contact vendor',
+							});
+						}
+						
 						const token = jwt.sign(
 							{
 								email: user[0].email,
@@ -130,7 +140,7 @@ exports.logIn = async (req, res) => {
 
 						const token2 = jwt.sign(
 							{
-								otp: OTP,
+								otp: user[0].otp,
 								email: user[0].email,
 								user_id: user[0].id,
 							},
@@ -260,10 +270,11 @@ exports.verifyOTP = async (req, res, next) => {
 			token,
 			"secret",
 		);
-		console.log(user_id)
+		console.log(otp.slice(-1))
 		const user = await User.findById(user_id);
 		if (user) {
-			if (OTP == otp) {
+			console.log("otp",user.otp)
+			if (user.otp.pop() === otp.pop()) {
 				const { name, email } = user;
 				return res.status(200).json({
 					message: "Login Successfully",

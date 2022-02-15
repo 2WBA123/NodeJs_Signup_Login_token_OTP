@@ -22,6 +22,7 @@ var transport = nodemailer.createTransport({
 });
 
 exports.signUp = async (req, res) => {
+	
 	// JOI STARTS HERE
 	// const { error, value } = authSignUp.validate(req.body); //JOI here validating
 	// if (error) {
@@ -33,6 +34,7 @@ exports.signUp = async (req, res) => {
 	User.find({ email: req.body.email })
 		.exec()
 		.then((user) => {
+			
 			if (user.length >= 1) {
 				return res.status(409).json({
 					message: 'Email Already Exist !',
@@ -63,6 +65,7 @@ exports.signUp = async (req, res) => {
 								expiresIn: '5h',
 							}
 						);
+						
 						transport.sendMail({
 							from: '"Auth System" emsproject44@gmail.com',
 							to: req.body.email,
@@ -76,9 +79,14 @@ exports.signUp = async (req, res) => {
 						}).catch(err => console.log(err));
 						//
 					}
+					 
 				});
 			}
-		});
+			return res.status(201).json({
+				
+				message:"Successfully Registered!!"
+			});
+		}).catch(err => console.log(err));
 };
 // Sign Up End Here
 
@@ -203,9 +211,9 @@ exports.emailVerified = async (req, res, next) => {
 		console.log(email)
 		const user = new User({
 			_id: mongoose.Types.ObjectId(),
-			name: req.body.name,
-			email: req.body.email,
-			password: hash,
+			name: user_name,
+			email: email,
+			password: password,
 			email_Verified:true
 		});
 		user.save()

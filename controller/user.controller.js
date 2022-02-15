@@ -6,7 +6,7 @@ const mongoose = require('mongoose');
 const nodemailer = require('nodemailer');
 
 var OTP;
-exports.GenerateOtp=()=>{
+exports.GenerateOtp = () => {
 	var otp = Math.random();
 	otp = otp * 1000000;
 	OTP = parseInt(otp);
@@ -22,7 +22,7 @@ var transport = nodemailer.createTransport({
 });
 
 exports.signUp = async (req, res) => {
-	
+
 	// JOI STARTS HERE
 	// const { error, value } = authSignUp.validate(req.body); //JOI here validating
 	// if (error) {
@@ -34,7 +34,7 @@ exports.signUp = async (req, res) => {
 	User.find({ email: req.body.email })
 		.exec()
 		.then((user) => {
-			
+
 			if (user.length >= 1) {
 				return res.status(409).json({
 					message: 'Email Already Exist !',
@@ -45,8 +45,7 @@ exports.signUp = async (req, res) => {
 				return res.status(400).send({
 					message: 'Please Enter Some Data',
 				});
-			} else
-			 {
+			} else {
 				bcrypt.hash(req.body.password, 10, (err, hash) => {
 					if (err) {
 						return res.status(500).json({
@@ -58,14 +57,14 @@ exports.signUp = async (req, res) => {
 							{
 								email: req.body.email,
 								user_name: req.body.name,
-								password:hash
+								password: hash
 							},
 							"secret",
 							{
 								expiresIn: '5h',
 							}
 						);
-						
+
 						transport.sendMail({
 							from: '"Auth System" emsproject44@gmail.com',
 							to: req.body.email,
@@ -79,12 +78,12 @@ exports.signUp = async (req, res) => {
 						}).catch(err => console.log(err));
 						//
 					}
-					 
+
 				});
 			}
 			return res.status(201).json({
-				
-				message:"Successfully Registered!!"
+
+				message: "Successfully Registered!!"
 			});
 		}).catch(err => console.log(err));
 };
@@ -115,47 +114,46 @@ exports.logIn = async (req, res) => {
 					});
 				}
 				if (result) {
-					if(user[0].email_Verified){
-                        this.GenerateOtp();
-					    console.log("otp = ",OTP)
-					 const token = jwt.sign(
-						{
-							email: user[0].email,
-							user_id: user[0].id,
-						},
-						"secret",
-						{
-							expiresIn: '5h',
-						}
-					);
+					if (user[0].email_Verified) {
+						this.GenerateOtp();
+						console.log("otp = ", OTP)
+						const token = jwt.sign(
+							{
+								email: user[0].email,
+								user_id: user[0].id,
+							},
+							"secret",
+							{
+								expiresIn: '5h',
+							}
+						);
 
-					const token2 = jwt.sign(
-						{
-							otp:OTP,
-							email: user[0].email,
-							user_id: user[0].id,
-						},
-						"secret",
-						{
-							expiresIn: '5h',
-						}
-					);
-
-					transport.sendMail({
-						from: '"Auth System" emsproject44@gmail.com',
-						to: req.body.email,
-						subject: "Please confirm your account",
-						html: `<div>
+						const token2 = jwt.sign(
+							{
+								otp: OTP,
+								email: user[0].email,
+								user_id: user[0].id,
+							},
+							"secret",
+							{
+								expiresIn: '5h',
+							}
+						);
+						transport.sendMail({
+							from: '"Auth System" emsproject44@gmail.com',
+							to: req.body.email,
+							subject: "Please confirm your account",
+							html: `<div>
 							<h1>Email Confirmation</h1>
 							<h2>Hello ${req.body.name}</h2>
 							<p>Thank you for Registration. Please confirm your email copy this token and send it back to confirm verification</p>
 							<p> ${token2}</p>
 							</div>`,
-					}).catch(err => console.log(err));
-					return res.status(200).json({
-						message: 'Use OTP SENT TO YOUR EMAIL FOR LOGIN !!!',
-						token: token,
-					});
+						}).catch(err => console.log(err));
+						return res.status(200).json({
+							message: 'Use OTP SENT TO YOUR EMAIL FOR LOGIN !!!',
+							token: token,
+						});
 					}
 				}
 				return res.status(401).json({
@@ -181,12 +179,12 @@ exports.verifyToken = async (req, res, next) => {
 			"secret",
 		);
 		console.log(email)
-		const user = await User.find({email:email});
+		const user = await User.find({ email: email });
 		console.log(user)
 		if (user) {
-			const { name, email,_id } = user[0];
+			const { name, email, _id } = user[0];
 			return res.status(200).json({
-				user_id:_id,
+				user_id: _id,
 				name,
 				email,
 				token,
@@ -204,7 +202,7 @@ exports.emailVerified = async (req, res, next) => {
 	try {
 		const { token } = req.body;
 		console.log(token);
-		const { email, user_name,password } = jwt.verify(
+		const { email, user_name, password } = jwt.verify(
 			token,
 			"secret",
 		);
@@ -214,14 +212,14 @@ exports.emailVerified = async (req, res, next) => {
 			name: user_name,
 			email: email,
 			password: password,
-			email_Verified:true
+			email_Verified: true
 		});
 		user.save()
 			// .select(' email password')
 			.then((result) => {
 				res.status(201).json({
 					result,
-					message:"Successfully Registered!!"
+					message: "Successfully Registered!!"
 				});
 			})
 			.catch((err) => {
@@ -258,26 +256,26 @@ exports.verifyOTP = async (req, res, next) => {
 	try {
 		const { token } = req.body;
 		console.log(token);
-		const { otp,email,user_id } = jwt.verify(
+		const { otp, email, user_id } = jwt.verify(
 			token,
 			"secret",
 		);
 		console.log(user_id)
 		const user = await User.findById(user_id);
 		if (user) {
-			if(OTP==otp){
+			if (OTP == otp) {
 				const { name, email } = user;
-			 return res.status(200).json({
-				message:"Login Successfully",
-				user_id,
-				name,
-				email,
-			});
-			}else{
 				return res.status(200).json({
-					message:"OTP not verified contact vendor"
+					message: "Login Successfully",
+					user_id,
+					name,
+					email,
 				});
-			}	
+			} else {
+				return res.status(200).json({
+					message: "OTP not verified contact vendor"
+				});
+			}
 		}
 		throw new Error('Something went wrong');
 	} catch (error) {

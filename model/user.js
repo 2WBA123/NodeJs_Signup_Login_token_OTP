@@ -7,7 +7,6 @@ const userSchema = new mongoose.Schema({
   password: { type: String },
   token: { type: String },
   email_Verified: { type:Boolean, default: false },
-  otp:{type:Array,default:[]}
 });
 
 module.exports = mongoose.model("user", userSchema);

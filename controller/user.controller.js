@@ -1,4 +1,5 @@
 const User = require('../model/user');
+const Otp = require('../model/otp');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 //const { authSignUp, authLogin } = require('../validations/user.validate');
@@ -12,6 +13,32 @@ exports.GenerateOtp = () => {
 	otp = parseInt(otp);
 	console.log(otp);
 	return otp;
+}
+exports.GenerateToken = (data) => {
+	const token = jwt.sign(
+		data,
+		"secret",
+		{
+			expiresIn: '5h',
+		}
+	);
+	return token;
+}
+
+exports.sendEmail = (data) => {
+	const token = this.GenerateToken(data);
+	transport.sendMail({
+		from: '"Auth System" emsproject44@gmail.com',
+		to: data.email,
+		subject: "Please confirm your account",
+		html: `<div>
+			<h1>Email Confirmation</h1>
+			<h2>Hello ${data.name}</h2>
+			<p>Thank you for Registration. Please confirm your email copy this token and send it back to confirm verification</p>
+			<p> ${token}</p>
+			</div>`,
+	}).catch(err => console.log(err));
+
 }
 
 var transport = nodemailer.createTransport({
@@ -32,6 +59,7 @@ exports.signUp = async (req, res) => {
 	// 	});
 	// }
 	// JOI ENDS HERE
+	const userOtp =await Otp.find({ email: req.body.email });
 	User.find({ email: req.body.email })
 		.exec()
 		.then((user) => {
@@ -53,39 +81,68 @@ exports.signUp = async (req, res) => {
 							error: err,
 						});
 					} else {
-						// 
-						const emailtoken = jwt.sign(
-							{
-								email: req.body.email,
-								user_name: req.body.name,
-								password: hash
-							},
-							"secret",
-							{
-								expiresIn: '5h',
+						//const userOtp = Otp.find({ email: req.body.email });
+						console.log("userotp",userOtp[0])
+						if (userOtp[0]) {
+							console.log(userOtp[0])
+							if (userOtp[0].otp.length < 3) {
+								const otp = this.GenerateOtp();
+								userOtp[0].otp.push(otp);
+								userOtp[0].save();
+								const data = {
+									email: req.body.email,
+									password: hash,
+									name: req.body.name,
+									otp: otp
+								}
+								this.sendEmail(data);
+								return res.status(202).json({
+									message:"OTP generated"
+								});
+							} else {
+								return res.status(501).json({
+									message: "OTP limit Reached contact vender!!"
+								});
 							}
-						);
-
-						transport.sendMail({
-							from: '"Auth System" emsproject44@gmail.com',
-							to: req.body.email,
-							subject: "Please confirm your account",
-							html: `<div>
-								<h1>Email Confirmation</h1>
-								<h2>Hello ${req.body.name}</h2>
-								<p>Thank you for Registration. Please confirm your email copy this token and send it back to confirm verification</p>
-								<p> ${emailtoken}</p>
-								</div>`,
-						}).catch(err => console.log(err));
+						} else {
+							const otp = this.GenerateOtp();
+							const userOtp = new Otp({
+								_id: mongoose.Types.ObjectId(),
+								email: req.body.email,
+								otp: otp
+							});
+							userOtp.save()
+								// .select(' email password')
+								.then((result) => {
+									const data = {
+										email: result.email,
+										password: hash,
+										name: req.body.name,
+										otp: result.otp,
+									}
+									this.sendEmail(data)
+									res.status(200).json({
+										result,
+										message: "OTP generated !!"
+									});
+								})
+								.catch((err) => {
+									console.log(err);
+									res.status(502).json({
+										error: err,
+									});
+								});
+						}
+						// 
 						//
 					}
 
 				});
 			}
-			return res.status(201).json({
+			// return res.status(201).json({
 
-				message: "Successfully Registered!!"
-			});
+			// 	message: "Successfully Registered!!"
+			// });
 		}).catch(err => console.log(err));
 };
 // Sign Up End Here
@@ -116,17 +173,6 @@ exports.logIn = async (req, res) => {
 				}
 				if (result) {
 					if (user[0].email_Verified) {
-						//console.log("otp = ", OTP)
-						if(user[0].otp.length<3){
-							const otp = this.GenerateOtp()
-							user[0].otp.push(otp);
-							user[0].save();
-						}else{
-							return res.status(401).json({
-								message: 'OTP Limmit reached contact vendor',
-							});
-						}
-						
 						const token = jwt.sign(
 							{
 								email: user[0].email,
@@ -137,29 +183,6 @@ exports.logIn = async (req, res) => {
 								expiresIn: '5h',
 							}
 						);
-
-						const token2 = jwt.sign(
-							{
-								otp: user[0].otp,
-								email: user[0].email,
-								user_id: user[0].id,
-							},
-							"secret",
-							{
-								expiresIn: '5h',
-							}
-						);
-						transport.sendMail({
-							from: '"Auth System" emsproject44@gmail.com',
-							to: req.body.email,
-							subject: "Please confirm your account",
-							html: `<div>
-							<h1>Email Confirmation</h1>
-							<h2>Hello ${req.body.name}</h2>
-							<p>Thank you for Registration. Please confirm your email copy this token and send it back to confirm verification</p>
-							<p> ${token2}</p>
-							</div>`,
-						}).catch(err => console.log(err));
 						return res.status(200).json({
 							message: 'Use OTP SENT TO YOUR EMAIL FOR LOGIN !!!',
 							token: token,
@@ -208,53 +231,31 @@ exports.verifyToken = async (req, res, next) => {
 	}
 };
 
-exports.emailVerified = async (req, res, next) => {
+exports.regenerateOtp = async (req, res, next) => {
 	try {
-		const { token } = req.body;
-		console.log(token);
-		const { email, user_name, password } = jwt.verify(
-			token,
-			"secret",
-		);
+		const { email, password, name } = req.body;
+
 		console.log(email)
-		const user = new User({
-			_id: mongoose.Types.ObjectId(),
-			name: user_name,
-			email: email,
-			password: password,
-			email_Verified: true
-		});
-		user.save()
-			// .select(' email password')
-			.then((result) => {
-				res.status(201).json({
-					result,
-					message: "Successfully Registered!!"
-				});
-			})
-			.catch((err) => {
-				console.log(err);
-				res.status(500).json({
-					error: err,
-				});
+		const userOtp = await Otp.find({ email: email });
+		console.log(userOtp)
+		if (userOtp) {
+			if (userOtp[0].otp.length < 3) {
+				const otp = this.GenerateOtp();
+				userOtp[0].otp.push(otp);
+				userOtp[0].save();
+				const data = {
+					email: email,
+					password: password,
+					name: name,
+					otp: otp
+				}
+				this.sendEmail(data);
+			}
+			return res.status(200).json({
+				message: "OTP regenrated check you email !!!"
 			});
-		// const user = await User.findOne({email:email});
-		// console.log(user)
-		// if (user) {
-		// 	console.log("wahab")
-		// 	user.name=user_name;
-		// 	user.email=email;
-		// 	user.password=password;
-		// 	user.email_Verified=true;
-		// 	console.log("wahab")
-		// 	await user.save();
-		// 	console.log("wahab",user.email_Verified)
-		// 	return res.status(200).json({
-		// 		email,
-		// 		user_name
-		// 	});
-		// }
-		// throw new Error('Something went wrong');
+		}
+		throw new Error('Something went wrong');
 	} catch (error) {
 		res.status(500).json({
 			message: 'Something went wrong,please try again later',
@@ -262,33 +263,55 @@ exports.emailVerified = async (req, res, next) => {
 	}
 };
 
+
 exports.verifyOTP = async (req, res, next) => {
 	try {
 		const { token } = req.body;
 		console.log(token);
-		const { otp, email, user_id } = jwt.verify(
+		const { otp, email, name, password } = jwt.verify(
 			token,
 			"secret",
 		);
-		console.log(otp.slice(-1))
-		const user = await User.findById(user_id);
-		if (user) {
-			console.log("otp",user.otp)
-			if (user.otp.pop() === otp.pop()) {
-				const { name, email } = user;
-				return res.status(200).json({
-					message: "Login Successfully",
-					user_id,
-					name,
-					email,
+		console.log(otp.pop())
+		const userOTP = await Otp.find({email:email});
+		const user = await User.find({email:email});
+		console.log(userOTP[0])
+		if(!user[0]){
+		 if (userOTP[0]) {
+			console.log("otp", userOTP[0].otp.pop())
+			if (userOTP[0].otp.pop() === otp.pop()) {
+				console.log("wahab adil")
+				const user = new User({
+					_id: mongoose.Types.ObjectId(),
+					name: name,
+					email: email,
+					password: password,
+					email_Verified: true
 				});
-			} else {
-				return res.status(200).json({
-					message: "OTP not verified contact vendor"
-				});
-			}
+				user.save()
+					// .select(' email password')
+					.then((result) => {
+						console.log(result)
+						res.status(201).json({
+							result,
+							message: "Successfully Registered!!"
+						});
+					})
+					.catch((err) => {
+						console.log(err);
+						res.status(501).json({
+							error: err,
+						});
+					});
+			} 
 		}
-		throw new Error('Something went wrong');
+
+	}else{
+		return res.status(400).json({
+			message:"User Already Exits"
+		})
+	}	 
+		//throw new Error('Something went wrong');
 	} catch (error) {
 		res.status(500).json({
 			message: 'Something went wrong,please try again later',

@@ -25,6 +25,12 @@ exports.GenerateToken = (data) => {
 	return token;
 }
 
+exports.calculateTimeDiff = (start_date,end_date) => {
+	const minutes = parseInt(Math.abs(end_date.getTime() - start_date.getTime()) / (1000 * 60) % 60);
+	console.log(minutes)
+	return minutes;
+}
+
 exports.sendEmail = (data) => {
 	const token = this.GenerateToken(data);
 	transport.sendMail({
@@ -81,19 +87,21 @@ exports.signUp = async (req, res) => {
 							error: err,
 						});
 					} else {
-						//const userOtp = Otp.find({ email: req.body.email });
+						//const userOtp =  Otp.find({ email: req.body.email });
 						console.log("userotp",userOtp[0])
+						const date = new Date();
+						console.log("datetime",date);
 						if (userOtp[0]) {
 							console.log(userOtp[0])
 							if (userOtp[0].otp.length < 3) {
 								const otp = this.GenerateOtp();
-								userOtp[0].otp.push(otp);
+								userOtp[0].otp.push({otp:otp,date:date});
 								userOtp[0].save();
 								const data = {
 									email: req.body.email,
 									password: hash,
 									name: req.body.name,
-									otp: otp
+									otp: {otp:otp,date:date}
 								}
 								this.sendEmail(data);
 								return res.status(202).json({
@@ -105,20 +113,22 @@ exports.signUp = async (req, res) => {
 								});
 							}
 						} else {
+							const date = new Date();
 							const otp = this.GenerateOtp();
 							const userOtp = new Otp({
 								_id: mongoose.Types.ObjectId(),
 								email: req.body.email,
-								otp: otp
+								otp: [{otp:otp,date:date}]
 							});
 							userOtp.save()
 								// .select(' email password')
 								.then((result) => {
+									console.log("wahab")
 									const data = {
 										email: result.email,
 										password: hash,
 										name: req.body.name,
-										otp: result.otp,
+										otp: {otp:otp,date:date},
 									}
 									this.sendEmail(data)
 									res.status(200).json({
@@ -240,20 +250,27 @@ exports.regenerateOtp = async (req, res, next) => {
 		console.log(userOtp)
 		if (userOtp) {
 			if (userOtp[0].otp.length < 3) {
+				const date = new Date();
 				const otp = this.GenerateOtp();
-				userOtp[0].otp.push(otp);
+				userOtp[0].otp.push({otp:otp,date:date});
 				userOtp[0].save();
 				const data = {
 					email: email,
 					password: password,
 					name: name,
-					otp: otp
+					otp: {otp:otp,date:date}
 				}
 				this.sendEmail(data);
+				return res.status(200).json({
+					message: "OTP regenrated check you email !!!"
+				});
 			}
-			return res.status(200).json({
-				message: "OTP regenrated check you email !!!"
-			});
+			else{
+				return res.status(403).json({
+					message: "OTP limit reached !!!"
+				});
+			}
+			
 		}
 		throw new Error('Something went wrong');
 	} catch (error) {
@@ -272,37 +289,56 @@ exports.verifyOTP = async (req, res, next) => {
 			token,
 			"secret",
 		);
-		console.log(otp.pop())
+		console.log("from token",otp)
 		const userOTP = await Otp.find({email:email});
 		const user = await User.find({email:email});
 		console.log(userOTP[0])
 		if(!user[0]){
+			
 		 if (userOTP[0]) {
-			console.log("otp", userOTP[0].otp.pop())
-			if (userOTP[0].otp.pop() === otp.pop()) {
-				console.log("wahab adil")
-				const user = new User({
-					_id: mongoose.Types.ObjectId(),
-					name: name,
-					email: email,
-					password: password,
-					email_Verified: true
-				});
-				user.save()
-					// .select(' email password')
-					.then((result) => {
-						console.log(result)
-						res.status(201).json({
-							result,
-							message: "Successfully Registered!!"
-						});
-					})
-					.catch((err) => {
-						console.log(err);
-						res.status(501).json({
-							error: err,
-						});
+			console.log("wahab")
+			console.log("wahab2")
+			 const otp1=userOTP[0].otp[userOTP[0].otp.length-1];
+			 //const otp1date=userOTP[0].otp.pop().date;
+			 console.log(otp1)
+			  const date=new Date();
+			  console.log(date)
+			  const otp2=otp.otp;
+			  console.log(otp2)
+			  const min=this.calculateTimeDiff(otp1.date,date)
+			  console.log(min)
+			//console.log("otp", userOTP[0].otp.pop().date)
+			if (otp1.otp == otp2) {
+				 if(min<15){
+					console.log("wahab adil")
+					const user = new User({
+						_id: mongoose.Types.ObjectId(),
+						name: name,
+						email: email,
+						password: password,
+						email_Verified: true
 					});
+					user.save()
+						// .select(' email password')
+						.then((result) => {
+							console.log(result)
+							res.status(201).json({
+								result,
+								message: "Successfully Registered!!"
+							});
+						})
+						.catch((err) => {
+							console.log(err);
+							res.status(501).json({
+								error: err,
+							});
+						});
+				}
+				else{
+					return res.status(505).json({
+						message:"OTP expired!!"
+					})
+				}
 			} 
 		}
 

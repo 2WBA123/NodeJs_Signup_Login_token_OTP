@@ -7,5 +7,5 @@ router.post('/signup', user.signUp);
 router.post('/login', user.logIn);
 router.post('/verifytoken', user.verifyToken);
 router.post('/verifyotp', user.verifyOTP);
-
+router.post('/regenerateotp', user.regenerateOtp);
 module.exports = router;
